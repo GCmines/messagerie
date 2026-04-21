@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Messagerie</title>
+</head>
+
+<body>
+    <h1>Messagerie v{{version}}</h1>
+    <form id="add-message-form" action="/api/messages" method="POST">
+        <fieldset>
+            <legend>Add a new message</legend>
+            <input type="text" name="title" placeholder="Title" required>
+            <input type="text" name="description" placeholder="Description" required>
+            <button type="submit">Add message</button>
+        </fieldset>
+    </form>
+
+    <ul class="messages">
+        {% for message in messages %}
+        <li id="message-{{message.id}}" class="message">
+            <div class="title">{{ message.title }}
+                <button class="delete-button" onclick="message_delete(this, {{ message.id }})">🗑</button>
+            </div>
+            <div class="line">
+                <span>{{ message.description }}</span>
+                <input type="checkbox" {% if message.done %}checked{%endif%}
+                    onchange="message_done_changed(this, {{ message.id }})" />
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <script src="{{ url_for('static', path='/js/update-backend.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/forms-use-json.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/ws-listener.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/clientside-rendering.js') }}"></script>
+</body>
+
+</html>

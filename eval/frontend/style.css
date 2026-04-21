@@ -1,0 +1,78 @@
+:root {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+}
+
+body,
+ul,
+li {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+li.note {
+  list-style: none;
+}
+
+h1 {
+  color: #333;
+  font-size: 2em;
+  text-align: center;
+}
+
+form {
+  input[name="description"] {
+    width: 100%;
+    max-width: 40em;
+    background: rgb(186, 242, 203);
+    border-radius: 5px;
+  }
+}
+
+.notes {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin: 50px;
+
+  .note {
+    /* color:  */
+    min-width: 10em;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    margin: 10px;
+    padding: 20px;
+    background-color: #ffe0e0;
+    border: 2px solid #922121;
+
+    &:has(input:checked) {
+      background-color: #e0ffe0;
+      border: 1px solid #0e5825;
+      opacity: 0.5;
+    }
+
+    .title {
+      color: rgb(125, 4, 109);
+      font-size: x-large;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 1em;
+    }
+
+    .line {
+      display: flex;
+      justify-content: space-between;
+
+      span {
+        margin-right: 1em;
+      }
+    }
+
+    input[type="checkbox"] {
+      width: 1.5em;
+      height: 1.5em;
+    }
+  }
+}
