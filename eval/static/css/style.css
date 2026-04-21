@@ -30,22 +30,22 @@ form {
   }
 }
 
-.notes {
+.messages {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: space-around;
   margin: 50px;
 
-  .note {
+  .message {
     /* color:  */
     min-width: 10em;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);   
     border-radius: 10px;
     margin: 10px;
     padding: 20px;
-    background-color: #ffe0e0;
-    border: 2px solid #922121;
+    background-color: #8bffbc;
+    border: 2px solid #72b938;
 
     &:has(input:checked) {
       background-color: #e0ffe0;
@@ -54,7 +54,7 @@ form {
     }
 
     .title {
-      color: rgb(125, 4, 109);
+      color: rgb(46, 37, 217);
       font-size: x-large;
       font-weight: 700;
       text-align: center;
