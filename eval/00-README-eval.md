@@ -66,12 +66,6 @@ then they are presented with the list of rooms; they can choose to
   - see the list of messages sent by other users and themselves
   - and write new messages to the room
 
-## bonus
-
-- admin pages to manage users and rooms (warning, this can be tedious to do)
-- registration form for new users
-- authentication (e.g. using JWT)
-
 ## evaluation criteria
 
 - the app should be functional and meet the requirements described above

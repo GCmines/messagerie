@@ -1,0 +1,111 @@
+<!-- static/index.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mini WhatsApp - Lobby</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .box { border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px; }
+    input, button { padding: 8px; margin: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Mini WhatsApp - Lobby</h1>
+
+  <div class="box">
+    <h3>Create user</h3>
+    <input id="userName" placeholder="username" />
+    <button onclick="createUser()">Create</button>
+    <div id="userResult"></div>
+  </div>
+
+  <div class="box">
+    <h3>Create room</h3>
+    <input id="roomName" placeholder="room name" />
+    <button onclick="createRoom()">Create</button>
+    <div id="roomResult"></div>
+  </div>
+
+  <div class="box">
+    <h3>Available rooms</h3>
+    <ul id="roomsList"></ul>
+    <button onclick="refreshRooms()">Refresh</button>
+  </div>
+
+  <div class="box">
+    <h3>Join as user</h3>
+    <input id="joinUser" placeholder="your username" />
+    <select id="joinRoom"></select>
+    <button onclick="goToChat()">Enter room</button>
+    <div>
+      <button onclick="subscribe()">Subscribe</button>
+      <button onclick="unsubscribe()">Unsubscribe</button>
+    </div>
+    <div id="subResult"></div>
+  </div>
+
+<script>
+const api = (path, opts) => fetch(path, opts).then(r => r.json().catch(()=>{}));
+
+async function createUser(){
+  const name = document.getElementById('userName').value.trim();
+  if(!name) return alert('enter name');
+  const res = await api('/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  document.getElementById('userResult').innerText = JSON.stringify(res);
+  refreshRooms();
+}
+
+async function createRoom(){
+  const name = document.getElementById('roomName').value.trim();
+  if(!name) return alert('enter room name');
+  const res = await api('/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
+  document.getElementById('roomResult').innerText = JSON.stringify(res);
+  refreshRooms();
+}
+
+async function refreshRooms(){
+  const rooms = await api('/rooms');
+  const ul = document.getElementById('roomsList');
+  ul.innerHTML = '';
+  const sel = document.getElementById('joinRoom');
+  sel.innerHTML = '';
+  (rooms || []).forEach(r => {
+    const li = document.createElement('li');
+    li.innerText = r.name;
+    ul.appendChild(li);
+    const opt = document.createElement('option');
+    opt.value = r.name;
+    opt.innerText = r.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function subscribe(){
+  const user = document.getElementById('joinUser').value.trim();
+  const room = document.getElementById('joinRoom').value;
+  if(!user || !room) return alert('user and room required');
+  const res = await api('/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_name:user, room_name:room})});
+  document.getElementById('subResult').innerText = JSON.stringify(res);
+}
+
+async function unsubscribe(){
+  const user = document.getElementById('joinUser').value.trim();
+  const room = document.getElementById('joinRoom').value;
+  if(!user || !room) return alert('user and room required');
+  const res = await api('/unsubscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_name:user, room_name:room})});
+  document.getElementById('subResult').innerText = JSON.stringify(res);
+}
+
+function goToChat(){
+  const user = document.getElementById('joinUser').value.trim();
+  const room = document.getElementById('joinRoom').value;
+  if(!user || !room) return alert('user and room required');
+  // open chat page with query params
+  window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(room)}`;
+}
+
+refreshRooms();
+</script>
+</body>
+</html>

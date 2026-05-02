@@ -1,0 +1,95 @@
+<!-- static/chat.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mini WhatsApp - Chat</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #messages { border: 1px solid #ddd; height: 400px; overflow:auto; padding: 8px; border-radius:6px; }
+    .msg { margin-bottom: 8px; }
+    .meta { color: #666; font-size: 12px; }
+    input, button { padding: 8px; margin: 4px; }
+  </style>
+</head>
+<body>
+  <h1 id="title">Chat</h1>
+  <div id="messages"></div>
+  <div>
+    <input id="content" placeholder="Type a message" style="width:70%" />
+    <button onclick="send()">Send</button>
+    <button onclick="leave()">Leave</button>
+  </div>
+
+<script>
+function qs(name){
+  const params = new URLSearchParams(location.search);
+  return params.get(name);
+}
+const user = qs('user');
+const room = qs('room');
+document.getElementById('title').innerText = `Room: ${room} — User: ${user}`;
+
+const messagesEl = document.getElementById('messages');
+
+function addMessage(m){
+  const div = document.createElement('div');
+  div.className = 'msg';
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.innerText = `${m.user_name} • ${new Date(m.created_at).toLocaleString()}`;
+  const content = document.createElement('div');
+  content.innerText = m.content;
+  div.appendChild(meta);
+  div.appendChild(content);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function loadHistory(){
+  const res = await fetch(`/rooms/${encodeURIComponent(room)}/messages`);
+  const data = await res.json();
+  (data || []).forEach(addMessage);
+}
+
+let ws;
+function connectWS(){
+  ws = new WebSocket(`ws://${location.host}/ws/${encodeURIComponent(user)}/${encodeURIComponent(room)}`);
+  ws.onopen = () => console.log('ws open');
+  ws.onmessage = (ev) => {
+    try {
+      const payload = JSON.parse(ev.data);
+      if(payload.error){
+        alert('WebSocket error: ' + payload.error);
+        return;
+      }
+      if(payload.info){
+        console.log(payload.info);
+        return;
+      }
+      addMessage(payload);
+    } catch(e){
+      console.log('raw', ev.data);
+    }
+  };
+  ws.onclose = () => console.log('ws closed');
+}
+
+function send(){
+  const content = document.getElementById('content').value.trim();
+  if(!content) return;
+  // send as JSON
+  ws.send(JSON.stringify({content}));
+  document.getElementById('content').value = '';
+}
+
+function leave(){
+  if(ws) ws.close();
+  window.location = '/static/index.html';
+}
+
+loadHistory();
+connectWS();
+</script>
+</body>
+</html>
