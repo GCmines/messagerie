@@ -10,6 +10,11 @@
     .msg { margin-bottom: 8px; }
     .meta { color: #666; font-size: 12px; }
     input, button { padding: 8px; margin: 4px; }
+    /* modal styles */
+    .modal-backdrop { position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:9999; }
+    .modal-box { background:#fff; padding:20px; border-radius:6px; min-width:320px; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .modal-box h3 { margin:0 0 10px 0; }
+    .modal-actions { text-align:right; margin-top:10px; }
   </style>
 </head>
 <body>
@@ -17,8 +22,8 @@
   <div id="messages"></div>
   <div>
     <input id="content" placeholder="Type a message" style="width:70%" />
-    <button onclick="send()">Send</button>
-    <button onclick="leave()">Leave</button>
+    <button id="sendBtn">Send</button>
+    <button id="leaveBtn">Leave</button>
   </div>
 
 <script>
@@ -26,9 +31,14 @@ function qs(name){
   const params = new URLSearchParams(location.search);
   return params.get(name);
 }
-const user = qs('user');
+let user = qs('user');
 const room = qs('room');
-document.getElementById('title').innerText = `Room: ${room} — User: ${user}`;
+
+if (!room) {
+  document.body.innerHTML = '<p>Room not specified. Open this page with ?room=ROOM_NAME (index.html should link here).</p>';
+} else {
+  document.getElementById('title').innerText = `Room: ${room} — User: ${user || 'selecting...'}`;
+}
 
 const messagesEl = document.getElementById('messages');
 
@@ -48,13 +58,17 @@ function addMessage(m){
 
 async function loadHistory(){
   const res = await fetch(`/rooms/${encodeURIComponent(room)}/messages`);
+  if (!res.ok) return;
   const data = await res.json();
   (data || []).forEach(addMessage);
 }
 
 let ws;
-function connectWS(){
-  ws = new WebSocket(`ws://${location.host}/ws/${encodeURIComponent(user)}/${encodeURIComponent(room)}`);
+function connectWS(chosenUser){
+  user = chosenUser || user;
+  document.getElementById('title').innerText = `Room: ${room} — User: ${user}`;
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${protocol}://${location.host}/ws/${encodeURIComponent(user)}/${encodeURIComponent(room)}`);
   ws.onopen = () => console.log('ws open');
   ws.onmessage = (ev) => {
     try {
@@ -73,23 +87,114 @@ function connectWS(){
     }
   };
   ws.onclose = () => console.log('ws closed');
+  ws.onerror = (e) => console.error('ws error', e);
 }
+
+document.getElementById('sendBtn').addEventListener('click', send);
+document.getElementById('leaveBtn').addEventListener('click', leave);
 
 function send(){
   const content = document.getElementById('content').value.trim();
-  if(!content) return;
+  if(!content || !ws || ws.readyState !== WebSocket.OPEN) return;
   // send as JSON
   ws.send(JSON.stringify({content}));
   document.getElementById('content').value = '';
 }
 
-function leave(){
-  if(ws) ws.close();
+async function leave(){
+  if (ws) ws.close();
+  if (user) {
+    try {
+      await fetch('/leave', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_name: user, room_name: room })
+      });
+    } catch (e) {
+      console.warn('leave error', e);
+    }
+  }
+  // redirect to index or static page
   window.location = '/static/index.html';
 }
 
-loadHistory();
-connectWS();
+/* Modal helper */
+function showModalSelect(title, options) {
+  return new Promise(resolve => {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    const h = document.createElement('h3'); h.textContent = title;
+    const select = document.createElement('select');
+    select.style = 'width:100%;padding:8px;margin-top:8px;';
+    options.forEach(opt => {
+      const o = document.createElement('option'); o.value = opt; o.textContent = opt;
+      select.appendChild(o);
+    });
+    const actions = document.createElement('div'); actions.className = 'modal-actions';
+    const ok = document.createElement('button'); ok.textContent = 'Rejoindre'; ok.style='margin-right:8px;';
+    const cancel = document.createElement('button'); cancel.textContent = 'Annuler';
+    actions.appendChild(ok); actions.appendChild(cancel);
+    box.appendChild(h); box.appendChild(select); box.appendChild(actions);
+    backdrop.appendChild(box);
+    document.body.appendChild(backdrop);
+
+    ok.onclick = () => { const v = select.value; document.body.removeChild(backdrop); resolve(v); };
+    cancel.onclick = () => { document.body.removeChild(backdrop); resolve(null); };
+  });
+}
+
+/* Flow: if user not provided in query, fetch available usernames and prompt selection,
+   then call /join to reserve and subscribe, then open WS and load history. */
+async function init() {
+  if (!room) return;
+  if (!user) {
+    try {
+      const res = await fetch('/available_usernames');
+      if (!res.ok) throw new Error('failed to fetch usernames');
+      const data = await res.json();
+      const usernames = data.available_usernames || [];
+      if (usernames.length === 0) {
+        alert('Aucun username disponible pour le moment. Créez-en un via /users ou réessayez plus tard.');
+        window.location = '/static/index.html';
+        return;
+      }
+      const choice = await showModalSelect('Choisissez un username', usernames);
+      if (!choice) {
+        window.location = '/static/index.html';
+        return;
+      }
+      // call /join to reserve username and subscribe
+      const joinRes = await fetch('/join', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_name: choice, room_name: room })
+      });
+      if (joinRes.status === 409) {
+        alert('Ce username a été pris entre-temps. Réessayez.');
+        return init(); // retry
+      }
+      if (!joinRes.ok) {
+        const err = await joinRes.json().catch(()=>({detail:'Erreur'}));
+        alert('Erreur: ' + (err.detail || 'Impossible de rejoindre'));
+        return;
+      }
+      // success: open WS and load history
+      connectWS(choice);
+      await loadHistory();
+    } catch (e) {
+      console.error(e);
+      alert('Erreur réseau ou serveur. Voir la console.');
+    }
+  } else {
+    // user provided in query: assume already reserved; open WS
+    connectWS(user);
+    await loadHistory();
+  }
+}
+
+init();
 </script>
 </body>
 </html>

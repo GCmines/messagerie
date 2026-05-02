@@ -61,7 +61,7 @@ def list_rooms(db: Session = Depends(get_db)):
     rooms = db.query(models.Room).all()
     return [{"name": r.name} for r in rooms]
 
-# --- subscribe / unsubscribe ---
+# --- subscribe / unsubscribe (existing endpoints) ---
 @app.post("/subscribe")
 def subscribe(action: schemas.SubscriptionAction, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.name == action.user_name).first()
@@ -143,6 +143,71 @@ def get_room_messages(room_name: str, db: Session = Depends(get_db)):
         })
     return out
 
+# --- New endpoints for username reservation and join/leave flow ---
+@app.get("/available_usernames")
+def available_usernames(db: Session = Depends(get_db)):
+    """
+    Return list of usernames present in DB but not currently taken by an active websocket.
+    """
+    users = db.query(models.User).all()
+    all_names = [u.name for u in users]
+    taken = manager.get_taken_usernames()
+    available = [n for n in all_names if n not in taken]
+    return {"available_usernames": available}
+
+class JoinRequest(schemas.SubscriptionAction):
+    pass
+
+@app.post("/join")
+def join_room(action: JoinRequest, db: Session = Depends(get_db)):
+    """
+    Reserve a username for a live connection and subscribe the user to the room.
+    This endpoint atomically:
+      - checks user and room exist
+      - checks username not already taken (in-memory)
+      - creates subscription if missing
+      - marks username as taken
+    """
+    user = db.query(models.User).filter(models.User.name == action.user_name).first()
+    room = db.query(models.Room).filter(models.Room.name == action.room_name).first()
+    if not user or not room:
+        raise HTTPException(status_code=404, detail="User or room not found")
+
+    # attempt to reserve username in manager
+    reserved = manager.reserve_username(action.user_name)
+    if not reserved:
+        raise HTTPException(status_code=409, detail="username already taken")
+
+    # ensure subscription exists
+    existing = db.query(models.Subscription).filter_by(user_id=user.id, room_id=room.id).first()
+    if not existing:
+        sub = models.Subscription(user_id=user.id, room_id=room.id)
+        db.add(sub)
+        db.commit()
+
+    return {"status": "ok", "room": room.name, "username": user.name}
+
+@app.post("/leave")
+def leave_room(action: schemas.SubscriptionAction, db: Session = Depends(get_db)):
+    """
+    Release a username and optionally unsubscribe from a room.
+    """
+    username = action.user_name
+    room_name = action.room_name
+
+    # release in-memory reservation
+    manager.release_username(username)
+
+    # optionally remove subscription if present
+    user = db.query(models.User).filter(models.User.name == username).first()
+    room = db.query(models.Room).filter(models.Room.name == room_name).first()
+    if user and room:
+        existing = db.query(models.Subscription).filter_by(user_id=user.id, room_id=room.id).first()
+        if existing:
+            db.delete(existing)
+            db.commit()
+    return {"status": "ok"}
+
 # --- WebSocket endpoint ---
 @app.websocket("/ws/{user_name}/{room_name}")
 async def websocket_endpoint(websocket: WebSocket, user_name: str, room_name: str, db: Session = Depends(get_db)):
@@ -161,7 +226,12 @@ async def websocket_endpoint(websocket: WebSocket, user_name: str, room_name: st
         await websocket.close()
         return
 
-    await manager.connect(room_name, websocket)
+    # Ensure username is reserved (defensive)
+    if not manager.is_username_taken(user_name):
+        # If username wasn't reserved via /join, reserve it now to avoid duplicates
+        manager.reserve_username(user_name)
+
+    await manager.connect(room_name, websocket, user_name)
     try:
         # send a welcome / recent messages
         await websocket.send_text('{"info":"connected","room":"%s"}' % room_name)
@@ -190,9 +260,12 @@ async def websocket_endpoint(websocket: WebSocket, user_name: str, room_name: st
             }
             await manager.broadcast(room_name, out)
     except WebSocketDisconnect:
+        # cleanup on disconnect
         manager.disconnect(room_name, websocket)
+        manager.release_username(user_name)
     except Exception:
         manager.disconnect(room_name, websocket)
+        manager.release_username(user_name)
         try:
             await websocket.close()
         except:

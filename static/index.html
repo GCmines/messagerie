@@ -7,7 +7,10 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     .box { border: 1px solid #ddd; padding: 12px; margin-bottom: 12px; border-radius: 6px; }
-    input, button { padding: 8px; margin: 4px; }
+    input, button, select { padding: 8px; margin: 4px; }
+    #roomsList { list-style: none; padding-left: 0; }
+    #roomsList li { padding: 6px 0; border-bottom: 1px dashed #eee; }
+    .small { font-size: 13px; color: #555; }
   </style>
 </head>
 <body>
@@ -17,14 +20,14 @@
     <h3>Create user</h3>
     <input id="userName" placeholder="username" />
     <button onclick="createUser()">Create</button>
-    <div id="userResult"></div>
+    <div id="userResult" class="small"></div>
   </div>
 
   <div class="box">
     <h3>Create room</h3>
     <input id="roomName" placeholder="room name" />
     <button onclick="createRoom()">Create</button>
-    <div id="roomResult"></div>
+    <div id="roomResult" class="small"></div>
   </div>
 
   <div class="box">
@@ -35,35 +38,50 @@
 
   <div class="box">
     <h3>Join as user</h3>
-    <input id="joinUser" placeholder="your username" />
-    <select id="joinRoom"></select>
-    <button onclick="goToChat()">Enter room</button>
-    <div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <input id="joinUser" placeholder="your username (leave empty to choose from available list)" style="flex:1" />
+      <select id="joinRoom" style="min-width:160px"></select>
+      <button onclick="goToChat()">Enter room</button>
+    </div>
+    <div style="margin-top:8px;">
       <button onclick="subscribe()">Subscribe</button>
       <button onclick="unsubscribe()">Unsubscribe</button>
+      <button onclick="fillFromAvailable()">Use available username</button>
+      <select id="availableUsers" style="min-width:200px"></select>
     </div>
-    <div id="subResult"></div>
+    <div id="subResult" class="small" style="margin-top:8px;"></div>
   </div>
 
 <script>
-const api = (path, opts) => fetch(path, opts).then(r => r.json().catch(()=>{}));
+/* Simple API helper that returns parsed JSON when possible, otherwise raw text */
+async function apiRaw(path, opts){
+  const res = await fetch(path, opts);
+  const text = await res.text();
+  try { return JSON.parse(text); } catch(e) { return text; }
+}
+const api = (path, opts) => apiRaw(path, opts);
 
+/* Create a new user */
 async function createUser(){
   const name = document.getElementById('userName').value.trim();
   if(!name) return alert('enter name');
   const res = await api('/users', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
   document.getElementById('userResult').innerText = JSON.stringify(res);
-  refreshRooms();
+  // refresh available usernames and rooms
+  await refreshRooms();
+  await refreshAvailableUsers();
 }
 
+/* Create a new room */
 async function createRoom(){
   const name = document.getElementById('roomName').value.trim();
   if(!name) return alert('enter room name');
   const res = await api('/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name})});
   document.getElementById('roomResult').innerText = JSON.stringify(res);
-  refreshRooms();
+  await refreshRooms();
 }
 
+/* Load and display rooms */
 async function refreshRooms(){
   const rooms = await api('/rooms');
   const ul = document.getElementById('roomsList');
@@ -81,12 +99,14 @@ async function refreshRooms(){
   });
 }
 
+/* Subscribe / Unsubscribe to a room for a given username */
 async function subscribe(){
   const user = document.getElementById('joinUser').value.trim();
   const room = document.getElementById('joinRoom').value;
   if(!user || !room) return alert('user and room required');
   const res = await api('/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_name:user, room_name:room})});
   document.getElementById('subResult').innerText = JSON.stringify(res);
+  await refreshAvailableUsers();
 }
 
 async function unsubscribe(){
@@ -95,17 +115,70 @@ async function unsubscribe(){
   if(!user || !room) return alert('user and room required');
   const res = await api('/unsubscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({user_name:user, room_name:room})});
   document.getElementById('subResult').innerText = JSON.stringify(res);
+  await refreshAvailableUsers();
 }
 
+/* Navigate to chat page.
+   If joinUser is empty, we only pass room param so chat.html will prompt selection from available usernames.
+   If joinUser is provided, pass both user and room.
+*/
 function goToChat(){
   const user = document.getElementById('joinUser').value.trim();
   const room = document.getElementById('joinRoom').value;
-  if(!user || !room) return alert('user and room required');
-  // open chat page with query params
-  window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(room)}`;
+  if(!room) return alert('room required');
+  if(user) {
+    window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(room)}`;
+  } else {
+    // let chat.html prompt the user to choose from available usernames
+    window.location = `/static/chat.html?room=${encodeURIComponent(room)}`;
+  }
 }
 
-refreshRooms();
+/* Fetch available usernames from server and populate the select */
+async function refreshAvailableUsers(){
+  const sel = document.getElementById('availableUsers');
+  sel.innerHTML = '';
+  try {
+    const res = await fetch('/available_usernames');
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = data.available_usernames || [];
+    if (list.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.innerText = '(no available usernames)';
+      sel.appendChild(opt);
+      return;
+    }
+    list.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u;
+      opt.innerText = u;
+      sel.appendChild(opt);
+    });
+  } catch (e) {
+    console.warn('failed to fetch available usernames', e);
+  }
+}
+
+/* Fill joinUser input from the selected available username */
+function fillFromAvailable(){
+  const sel = document.getElementById('availableUsers');
+  const val = sel.value;
+  if (!val) return alert('no username selected');
+  document.getElementById('joinUser').value = val;
+}
+
+/* Initialize lobby: load rooms and available usernames */
+async function initLobby(){
+  await refreshRooms();
+  await refreshAvailableUsers();
+}
+
+/* Auto-refresh available usernames every 10s to keep UI up-to-date */
+setInterval(refreshAvailableUsers, 10000);
+
+initLobby();
 </script>
 </body>
 </html>
