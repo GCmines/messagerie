@@ -1,7 +1,4 @@
-# models.py
-# Définition des tables : User, Room, Subscription, Message
-
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, UniqueConstraint #on aurait pu faire un import all là non?
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base

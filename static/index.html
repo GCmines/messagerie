@@ -1,4 +1,3 @@
-<!-- static/index.html -->
 <!doctype html>
 <html>
 <head>
@@ -37,7 +36,7 @@
 
       <div class="box">
         <h3>Join as user</h3>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px;">
           <select id="availableUsers" style="flex:1; min-width:200px"></select>
           <select id="joinRoom" style="min-width:160px"></select>
           <button id="enterRoomBtn">Enter room</button>
@@ -65,14 +64,14 @@
       </div>
 
       <div class="composer" style="justify-content:center">
-        <input type="text" placeholder="Sélectionnez une room à gauche pour démarrer (pensez à vous inscrire :)" disabled />
+        <input type="text" placeholder="Sélectionnez une room à gauche pour démarrer (pensez à vous inscrire :)  )" disabled />
         <button class="secondary">Envoyer</button>
       </div>
     </main>
   </div>
 
 <script>
-/* API helper */
+
 async function apiRaw(path, opts){
   const res = await fetch(path, opts);
   const text = await res.text();
@@ -80,7 +79,7 @@ async function apiRaw(path, opts){
 }
 const api = (path, opts) => apiRaw(path, opts);
 
-/* debounce util */
+
 function debounce(fn, wait = 180) {
   let t;
   return (...args) => {
@@ -89,10 +88,10 @@ function debounce(fn, wait = 180) {
   };
 }
 
-/* state for preserving selection */
+
 let lastSelectedUsername = localStorage.getItem('lastSelectedUsername') || null;
 
-/* populate available usernames while preserving selection */
+
 function populateAvailable(sel, list) {
   const prev = lastSelectedUsername || sel.value || null;
   sel.innerHTML = '';
@@ -128,7 +127,7 @@ function populateAvailable(sel, list) {
   try { localStorage.setItem('lastSelectedUsername', lastSelectedUsername); } catch(e){}
 }
 
-/* refresh available users (debounced) */
+
 const _refreshAvailableUsers = async function(keepSelection = true) {
   const sel = document.getElementById('availableUsers');
   if (!sel) return;
@@ -156,7 +155,7 @@ const _refreshAvailableUsers = async function(keepSelection = true) {
 };
 const refreshAvailableUsers = debounce(_refreshAvailableUsers, 180);
 
-/* refresh rooms */
+
 async function refreshRooms(){
   try {
     const rooms = await api('/rooms');
@@ -188,7 +187,7 @@ async function refreshRooms(){
   }
 }
 
-/* create user / room */
+
 async function createUser(){
   const name = document.getElementById('userName').value.trim();
   if(!name) return alert('enter name');
@@ -207,7 +206,6 @@ async function createRoom(){
   document.getElementById('roomName').value = '';
 }
 
-/* subscribe / unsubscribe preserving selection */
 async function subscribe(){
   const user = document.getElementById('availableUsers').value;
   const room = document.getElementById('joinRoom').value;
@@ -245,7 +243,6 @@ async function unsubscribe(){
   refreshAvailableUsers(true);
 }
 
-/* go to chat */
 function goToChat(){
   const user = document.getElementById('availableUsers').value;
   const room = document.getElementById('joinRoom').value;
@@ -253,8 +250,6 @@ function goToChat(){
   if(!user) return alert('choose a username from the list');
   window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(room)}`;
 }
-
-/* initialization */
 async function initLobby(){
   document.getElementById('createUserBtn').addEventListener('click', createUser);
   document.getElementById('createRoomBtn').addEventListener('click', createRoom);
@@ -267,7 +262,6 @@ async function initLobby(){
   await refreshAvailableUsers(true);
 }
 
-/* periodic refresh but preserve selection */
 setInterval(() => refreshAvailableUsers(true), 10000);
 
 initLobby();

@@ -1,4 +1,3 @@
-# main.py
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -201,9 +200,6 @@ async def websocket_endpoint(websocket: WebSocket, user_name: str, room_name: st
         await websocket.send_text('{"error":"not_subscribed"}')
         await websocket.close()
         return
-
-    # Do NOT call reserve_username here to avoid overwriting reservation state.
-    # If username wasn't reserved via /join, we still allow the connection and register it.
     await manager.connect(room_name, websocket, user_name)
     try:
         await websocket.send_text('{"info":"connected","room":"%s"}' % room_name)

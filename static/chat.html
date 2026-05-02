@@ -1,4 +1,3 @@
-<!-- static/chat.html -->
 <!doctype html>
 <html>
 <head>
@@ -39,11 +38,10 @@
           <div class="title" id="roomTitle">—</div>
           <div class="sub" id="roomSub">—</div>
         </div>
-        <div class="small">Petit style Matrix :)</div>
+        <div class="small">Petit style Matrix :)</div>  /* T'es sûr que tu veux qu'on laisse ça? */
       </div>
 
       <div id="messages"></div>
-
       <div class="composer">
         <input id="content" type="text" placeholder="Tapez votre message..." />
         <button id="sendBtn">Send</button>
@@ -52,14 +50,13 @@
   </div>
 
 <script>
-/* utilities */
+
 function qs(name){
   const params = new URLSearchParams(location.search);
   return params.get(name);
 }
 function el(id){ return document.getElementById(id); }
 
-/* state */
 let user = qs('user');
 const room = qs('room');
 const messagesEl = el('messages');
@@ -69,14 +66,14 @@ const roomSubEl = el('roomSub');
 const noRoomsMsg = el('noRoomsMsg');
 let ws = null;
 
-/* header */
+
 function setHeader(u, r){
   currentUserEl.textContent = u || '—';
   roomTitleEl.textContent = r || '—';
   roomSubEl.textContent = u ? `Connected as ${u}` : 'Not connected';
 }
 
-/* build DOM node for a message (supports pending marker) */
+
 function buildMessageNode(m){
   const wrapper = document.createElement('div');
   wrapper.className = 'msg ' + (m.user_name === user ? 'me' : 'other');
@@ -102,11 +99,11 @@ function buildMessageNode(m){
   return wrapper;
 }
 
-/* appendMessage with deduplication: replace pending when server message arrives */
+
 function appendMessage(m){
   const isPending = !!m.__pending;
   if (!isPending) {
-    // try to find a matching pending message (same user + same content)
+    
     const pendingNodes = Array.from(messagesEl.querySelectorAll('.msg.pending'));
     for (const node of pendingNodes) {
       const bubble = node.querySelector('.bubble');
@@ -127,7 +124,7 @@ function appendMessage(m){
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-/* load history from server */
+
 async function loadHistory(){
   if (!room) return;
   try {
@@ -141,7 +138,7 @@ async function loadHistory(){
   }
 }
 
-/* WebSocket connection */
+
 function connectWS(chosenUser){
   user = chosenUser || user;
   setHeader(user, room);
@@ -169,7 +166,7 @@ function connectWS(chosenUser){
   ws.onerror = (e) => console.error('ws error', e);
 }
 
-/* send with pending echo and deduplication */
+
 function send(){
   const input = el('content');
   const text = input.value.trim();
@@ -179,8 +176,8 @@ function send(){
     return;
   }
 
-  // create a local pending message
-  const pendingMsg = {
+  
+  const pendingMsg = { /*Tu m'as pas ré-expliqué comment t'avais fait ça */
     id: null,
     user_name: user,
     room_name: room,
@@ -191,7 +188,7 @@ function send(){
   };
   appendMessage(pendingMsg);
 
-  // send to server
+  
   try {
     ws.send(JSON.stringify({ content: text }));
   } catch (e) {
@@ -200,7 +197,7 @@ function send(){
   input.value = '';
 }
 
-/* leave room */
+
 async function leave(){
   if (ws) ws.close();
   if (user) {
@@ -217,7 +214,7 @@ async function leave(){
   window.location = '/static/index.html';
 }
 
-/* modal to choose username */
+
 function showModalSelect(title, options){
   return new Promise(resolve => {
     const backdrop = document.createElement('div');
@@ -244,14 +241,14 @@ function showModalSelect(title, options){
   });
 }
 
-/* fetch and display only rooms the user is subscribed to */
+
 async function refreshRoomsForUser(){
   const ul = el('roomsList');
   ul.innerHTML = '';
   noRoomsMsg.classList.add('hidden');
 
   if (!user) {
-    // if no user in query, prompt selection to know which subscriptions to show
+    
     try {
       const res = await fetch('/available_usernames');
       if (!res.ok) throw new Error('failed to fetch usernames');
@@ -268,13 +265,13 @@ async function refreshRoomsForUser(){
         noRoomsMsg.classList.remove('hidden');
         return;
       }
-      // attempt to join/reserve username so we can fetch subscriptions safely
+      
       const joinRes = await fetch('/join', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ user_name: choice, room_name: '' })
       }).catch(()=>null);
-      // ignore join result if server expects a room; we only need the username
+      
       user = choice;
       setHeader(user, room);
     } catch (e) {
@@ -285,23 +282,23 @@ async function refreshRoomsForUser(){
     }
   }
 
-  // fetch subscriptions for this user
+  
   try {
     const res = await fetch(`/subscriptions/${encodeURIComponent(user)}`);
     if (!res.ok) {
-      // if 404, user not found
+      
       noRoomsMsg.textContent = 'Utilisateur introuvable ou pas d\'abonnement.';
       noRoomsMsg.classList.remove('hidden');
       return;
     }
     const data = await res.json();
-    const rooms = data.rooms || [];
+    const rooms = data.rooms || []; /*je me demande si ça se chevauche pas tes fonctions et les miennes là */
     if (!rooms.length) {
       noRoomsMsg.textContent = 'Vous n\'êtes abonné à aucune room. Retournez au lobby pour vous abonner.';
       noRoomsMsg.classList.remove('hidden');
       return;
     }
-    // populate list with only subscribed rooms
+    
     rooms.forEach(rname => {
       const li = document.createElement('li');
       li.className = 'room-item';
@@ -323,10 +320,9 @@ async function refreshRoomsForUser(){
   }
 }
 
-/* initialization flow */
+
 async function init(){
   if (!room) {
-    // no room in query: still show user's subscribed rooms in sidebar
     await refreshRoomsForUser();
     setHeader(user, room);
     return;
@@ -335,7 +331,6 @@ async function init(){
   setHeader(user, room);
 
   if (!user) {
-    // if user not provided, try to fetch available usernames and prompt selection
     try {
       const res = await fetch('/available_usernames');
       if (!res.ok) throw new Error('failed to fetch usernames');
@@ -377,17 +372,13 @@ async function init(){
     await loadHistory();
   }
 
-  // populate sidebar with subscribed rooms for this user
   await refreshRoomsForUser();
 }
-
-/* event wiring */
 el('sendBtn').addEventListener('click', send);
 el('content').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
 el('leaveBtn').addEventListener('click', leave);
 el('refreshRoomsBtn').addEventListener('click', refreshRoomsForUser);
 
-/* start */
 init();
 </script>
 </body>

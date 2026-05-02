@@ -1,6 +1,3 @@
-# database.py
-# Configuration de la base SQLite et création de la session SQLAlchemy
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
@@ -13,3 +10,5 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+# ça sert à quoi le database.py? 
+# C'est pour créer une connexion à la base de données et à définir une session pour interagir avec. Y'a aussi une classe de base pour les modèles de données qui seront utilisés dans l'appli.

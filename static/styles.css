@@ -36,7 +36,6 @@ body{
   padding:28px;
 }
 
-/* top banner */
 .topbar{
   position:fixed;
   left:0;
@@ -68,7 +67,6 @@ body{
   box-shadow:0 0 12px rgba(0,255,127,0.18), inset 0 -2px rgba(0,0,0,0.2);
 }
 
-/* container */
 .app{
   width:100%;
   max-width:var(--max-width);
@@ -80,7 +78,6 @@ body{
   align-content:start;
 }
 
-/* panels */
 .panel{
   background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   border-radius:var(--radius);
@@ -90,7 +87,6 @@ body{
   color:#dfffe8;
 }
 
-/* lobby */
 .lobby{
   display:flex;
   flex-direction:column;
@@ -134,7 +130,6 @@ body{
   box-shadow:0 12px 30px rgba(0,255,127,0.08);
 }
 
-/* rooms list */
 #roomsList{list-style:none;padding:0;margin:0;max-height:520px;overflow:auto}
 #roomsList li{
   padding:12px;
@@ -153,10 +148,9 @@ body{
   box-shadow:0 14px 30px rgba(0,0,0,0.5);
   background:linear-gradient(180deg, rgba(0,255,127,0.02), rgba(0,0,0,0.02));
 }
-#roomsList li .name{font-weight:700;color:#eafff0}
-#roomsList li .meta{font-size:12px;color:var(--muted)}
+#roomsList li .name{font-weight:700;color:#183a22}
+#roomsList li .meta{font-size:12px;color:var(--bubble-me)}
 
-/* chat area */
 .chat{
   display:flex;
   flex-direction:column;
@@ -175,7 +169,6 @@ body{
 .header .title{font-weight:800;font-size:18px;color:var(--neon);font-family:var(--mono)}
 .header .sub{color:var(--muted);font-size:13px}
 
-/* messages */
 #messages{
   background:linear-gradient(180deg,#04120a 0%, #071a12 100%);
   padding:18px;
@@ -214,8 +207,8 @@ body{
   color:#e6fff2;
   border-bottom-left-radius:6px;
 }
-
-/* composer */
+/* y'a des trucs on a changé le noms des ids sans les changer ici je crois non?*/
+/*aaaaaaaah peut-être bien faudrait vérifier mais je vais pas avoir le temps là*/ 
 .composer{
   display:flex;
   gap:10px;
@@ -250,7 +243,6 @@ body{
   box-shadow:0 12px 30px rgba(0,255,127,0.08);
 }
 
-/* available users */
 #availableUsers{
   background:linear-gradient(180deg, rgba(0,0,0,0.03), transparent);
   color:inherit;
@@ -259,7 +251,6 @@ body{
   border-radius:8px;
 }
 
-/* credit */
 .credit{
   margin-top:8px;
   font-size:12px;
@@ -272,12 +263,14 @@ body{
   letter-spacing:0.6px;
 }
 
-/* subtle hover */
+
 input:hover, select:hover, button:hover, #roomsList li:hover{
   filter:brightness(1.02);
 }
 
-/* desktop-first adjustments already set; responsive fallback for smaller screens */
+/*fais un truc ici pour les écrans plus petits, genre empiler les panels et réduire la hauteur des messages*/
+/*T'es sûr? On fait pas juste les PC?*/
+/*Dans le doute*/
 @media (max-width:1100px){
   .app{
     grid-template-columns: 1fr;
@@ -286,7 +279,6 @@ input:hover, select:hover, button:hover, #roomsList li:hover{
   #messages{height:48vh}
 }
 
-/* helpers */
 .center{text-align:center}
 .small{font-size:13px;color:var(--muted)}
 .hidden{display:none}

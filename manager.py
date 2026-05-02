@@ -6,13 +6,11 @@ import json
 
 class ConnectionManager:
     def __init__(self):
-        # room_name -> set of websockets
         self.rooms: Dict[str, Set[WebSocket]] = {}
-        # username -> set of websocket ids
         self.username_map: Dict[str, Set[int]] = {}
-        # websocket id -> (room_name, username)
         self.ws_meta: Dict[int, Tuple[str, str]] = {}
-        self._lock = asyncio.Lock()
+        self._lock = asyncio.Lock() # Le lock c'est ce dont tu me parlais dans ton mail?
+        #Yes c'est ça c'est pour éviter les problèmes de concu quand plusieurs connexions essaient de se connecter ou se déconnecter en même temps.
 
     async def connect(self, room: str, websocket: WebSocket, username: str):
         await websocket.accept()
@@ -36,7 +34,6 @@ class ConnectionManager:
             if ids:
                 ids.discard(id(websocket))
                 if not ids:
-                    # no more sockets for this username
                     del self.username_map[username]
 
     def reserve_username(self, username: str) -> bool:
@@ -71,7 +68,6 @@ class ConnectionManager:
             try:
                 await ws.send_text(text)
             except Exception:
-                # ignore send errors; cleanup happens on disconnect
                 pass
 
     def get_taken_usernames(self) -> List[str]:
