@@ -16,9 +16,10 @@
       <h2 class="center">Rooms</h2>
 
       <div class="box">
-        <h3>Rooms</h3>
+        <h3>Rooms auxquelles vous êtes abonné</h3>
         <ul id="roomsList"></ul>
         <button id="refreshRoomsBtn">Refresh</button>
+        <div id="noRoomsMsg" class="small hidden" style="margin-top:8px;">Vous n'êtes abonné à aucune room. Retournez au lobby pour vous abonner.</div>
       </div>
 
       <div class="box">
@@ -38,7 +39,7 @@
           <div class="title" id="roomTitle">—</div>
           <div class="sub" id="roomSub">—</div>
         </div>
-        <div class="small">On a tenté de reproduire un petit style Matrix</div>
+        <div class="small">Petit style Matrix :)</div>
       </div>
 
       <div id="messages"></div>
@@ -65,6 +66,7 @@ const messagesEl = el('messages');
 const currentUserEl = el('currentUser');
 const roomTitleEl = el('roomTitle');
 const roomSubEl = el('roomSub');
+const noRoomsMsg = el('noRoomsMsg');
 let ws = null;
 
 /* header */
@@ -242,15 +244,98 @@ function showModalSelect(title, options){
   });
 }
 
+/* fetch and display only rooms the user is subscribed to */
+async function refreshRoomsForUser(){
+  const ul = el('roomsList');
+  ul.innerHTML = '';
+  noRoomsMsg.classList.add('hidden');
+
+  if (!user) {
+    // if no user in query, prompt selection to know which subscriptions to show
+    try {
+      const res = await fetch('/available_usernames');
+      if (!res.ok) throw new Error('failed to fetch usernames');
+      const data = await res.json();
+      const list = data.available_usernames || [];
+      if (list.length === 0) {
+        noRoomsMsg.textContent = 'Aucun username disponible. Retournez au lobby pour créer un utilisateur.';
+        noRoomsMsg.classList.remove('hidden');
+        return;
+      }
+      const choice = await showModalSelect('Choisissez un username pour voir vos rooms', list);
+      if (!choice) {
+        noRoomsMsg.textContent = 'Aucun utilisateur sélectionné.';
+        noRoomsMsg.classList.remove('hidden');
+        return;
+      }
+      // attempt to join/reserve username so we can fetch subscriptions safely
+      const joinRes = await fetch('/join', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_name: choice, room_name: '' })
+      }).catch(()=>null);
+      // ignore join result if server expects a room; we only need the username
+      user = choice;
+      setHeader(user, room);
+    } catch (e) {
+      console.warn('failed to prompt username', e);
+      noRoomsMsg.textContent = 'Impossible de récupérer les utilisateurs disponibles.';
+      noRoomsMsg.classList.remove('hidden');
+      return;
+    }
+  }
+
+  // fetch subscriptions for this user
+  try {
+    const res = await fetch(`/subscriptions/${encodeURIComponent(user)}`);
+    if (!res.ok) {
+      // if 404, user not found
+      noRoomsMsg.textContent = 'Utilisateur introuvable ou pas d\'abonnement.';
+      noRoomsMsg.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    const rooms = data.rooms || [];
+    if (!rooms.length) {
+      noRoomsMsg.textContent = 'Vous n\'êtes abonné à aucune room. Retournez au lobby pour vous abonner.';
+      noRoomsMsg.classList.remove('hidden');
+      return;
+    }
+    // populate list with only subscribed rooms
+    rooms.forEach(rname => {
+      const li = document.createElement('li');
+      li.className = 'room-item';
+      const name = document.createElement('div'); name.className = 'name'; name.textContent = rname;
+      const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = '';
+      li.appendChild(name);
+      li.appendChild(meta);
+      li.onclick = () => {
+        if (!user) return alert('Sélectionnez d\'abord un username');
+        if (rname === room) return;
+        window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(rname)}`;
+      };
+      ul.appendChild(li);
+    });
+  } catch (e) {
+    console.warn('refreshRoomsForUser error', e);
+    noRoomsMsg.textContent = 'Erreur lors de la récupération des rooms.';
+    noRoomsMsg.classList.remove('hidden');
+  }
+}
+
 /* initialization flow */
 async function init(){
   if (!room) {
-    document.body.innerHTML = '<p style="padding:24px">Room not specified. Retournez au lobby et sélectionnez une room.</p>';
+    // no room in query: still show user's subscribed rooms in sidebar
+    await refreshRoomsForUser();
+    setHeader(user, room);
     return;
   }
+
   setHeader(user, room);
 
   if (!user) {
+    // if user not provided, try to fetch available usernames and prompt selection
     try {
       const res = await fetch('/available_usernames');
       if (!res.ok) throw new Error('failed to fetch usernames');
@@ -285,48 +370,22 @@ async function init(){
     } catch (e) {
       console.error(e);
       alert('Erreur réseau ou serveur. Voir la console.');
+      return;
     }
   } else {
     connectWS(user);
     await loadHistory();
   }
 
-  // populate rooms list for sidebar convenience
-  refreshRooms();
-}
-
-/* refresh rooms for sidebar */
-async function refreshRooms(){
-  try {
-    const res = await fetch('/rooms');
-    if (!res.ok) return;
-    const rooms = await res.json();
-    const ul = el('roomsList');
-    ul.innerHTML = '';
-    (rooms || []).forEach(r => {
-      const li = document.createElement('li');
-      li.className = 'room-item';
-      const name = document.createElement('div'); name.className = 'name'; name.textContent = r.name;
-      const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = '';
-      li.appendChild(name);
-      li.appendChild(meta);
-      li.onclick = () => {
-        if (!user) return alert('Sélectionnez d\'abord un username');
-        if (r.name === room) return;
-        window.location = `/static/chat.html?user=${encodeURIComponent(user)}&room=${encodeURIComponent(r.name)}`;
-      };
-      ul.appendChild(li);
-    });
-  } catch(e){
-    console.warn('refreshRooms error', e);
-  }
+  // populate sidebar with subscribed rooms for this user
+  await refreshRoomsForUser();
 }
 
 /* event wiring */
 el('sendBtn').addEventListener('click', send);
 el('content').addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
 el('leaveBtn').addEventListener('click', leave);
-el('refreshRoomsBtn').addEventListener('click', refreshRooms);
+el('refreshRoomsBtn').addEventListener('click', refreshRoomsForUser);
 
 /* start */
 init();
